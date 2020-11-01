@@ -25,25 +25,25 @@ int NX;
 int NUM;
 int radius;
 
-//Other constants
+//Other constants，9个速度方向
 const int NPOP=9;
 
 //Time steps
 int N=64000;
 int NOUTPUT=200;
 
-//Fields and populations
-double *f;
-double *f2;
-double *rho;
-double *ux;
-double *uy;
-int * geometry;
+//Fields and populations  流体性质（速度密度）与分布 的 数组
+double *f;    //碰撞前分布
+double *f2;     //碰撞后分布
+double *rho;    //密度
+double *ux;     //x方向速度
+double *uy;     //y方向速度
+int * geometry; //？？？？？？？？？？？？？
 
 //Boundary conditions
 double conc_wall=1.0;
-std::vector<int> bb_nodes;
-std::vector<char>* dirs;
+std::vector<int> bb_nodes;//边界点
+std::vector<char>* dirs;//边界点的反弹方向
 int *bottom;
 int *top;
 
@@ -56,13 +56,13 @@ double omega_minus=omega;
 double ce=1.0/3.0;
 
 //Underlying lattice parameters
-double weights[]={4.0/9.0,1.0/9.0,1.0/9.0,1.0/9.0,1.0/9.0,1.0/36.0,1.0/36.0,1.0/36.0,1.0/36.0};
-double weights_trt[]={0.0,1.0/3.0,1.0/3.0,1.0/3.0,1.0/3.0,1.0/12.0,1.0/12.0,1.0/12.0,1.0/12.0};
-int cx[]={0,1,0,-1,0,1,-1,-1,1};
+double weights[]={4.0/9.0,1.0/9.0,1.0/9.0,1.0/9.0,1.0/9.0,1.0/36.0,1.0/36.0,1.0/36.0,1.0/36.0};     //速度分量的权重（从中心点0开始）
+double weights_trt[]={0.0,1.0/3.0,1.0/3.0,1.0/3.0,1.0/3.0,1.0/12.0,1.0/12.0,1.0/12.0,1.0/12.0};     //？？？
+int cx[]={0,1,0,-1,0,1,-1,-1,1};                                                                    //cx cy速度分量（九个速度矢量（x，y））
 int cy[]={0,0,1,0,-1,1,1,-1,-1};
-int complement[]={0,3,4,1,2,7,8,5,6};
-int pxx[]={0, 1, -1, 1, -1, 0, 0, 0, 0};
-int pxy[]={0, 0, 0, 0, 0, 1, -1, 1, -1};
+int complement[]={0,3,4,1,2,7,8,5,6};                                                               //速度分量的下标
+int pxx[]={0, 1, -1, 1, -1, 0, 0, 0, 0};                                                            //
+int pxy[]={0, 0, 0, 0, 0, 1, -1, 1, -1};                                                            //
 
 void writedensity(std::string const & fname)
 {
@@ -75,7 +75,7 @@ void writedensity(std::string const & fname)
         for (int iY=0; iY<NY; iY++)
         {
             int counter=iY*NX+iX;
-            fout<<rho[counter]<<" ";
+            fout<<rho[counter]<<" ";//输出格点的密度
         }
         fout<<"\n";
     }
@@ -100,32 +100,32 @@ void writegeometry(std::string const & fname)
 
 
 
-void init()
+void init()     //初始化
 {
-    //Creating arrays
-    f=new double[NUM*NPOP];
-    f2=new double[NUM*NPOP];
+    //Creating arrays               节点个数 * 速度分量个数
+    f=new double[NUM*NPOP];         //碰撞前的分布
+    f2=new double[NUM*NPOP];        //碰撞后的分布
     
     //Bulk nodes initialization
-    double feq;
+    double feq;                     
     double geq;
     double sum;
     
     for(int iY=0;iY<NY;iY++)
-        for(int iX=0;iX<NX;iX++)
+        for(int iX=0;iX<NX;iX++)    //遍历每个节点
         {
-            int  counter=iY*NX+iX;
-            double dense_temp=rho[counter];
-            double ux_temp=ux[counter];
-            double uy_temp=uy[counter];
+            int  counter=iY*NX+iX;      //计数
+            double dense_temp=rho[counter];     //碰撞前密度
+            double ux_temp=ux[counter];         //碰撞前速度x方向
+            double uy_temp=uy[counter];         //碰撞前速度y方向
             
-            for (int k=0; k<NPOP; k++)
+            for (int k=0; k<NPOP; k++)//遍历每个速度分量
             {
-                feq=weights[k]*(dense_temp+3.0*dense_temp*(cx[k]*ux_temp+cy[k]*uy_temp)
+                feq=weights[k]*(dense_temp+3.0*dense_temp*(cx[k]*ux_temp+cy[k]*uy_temp) //计算平衡分布
                                 +4.5*dense_temp*((cx[k]*cx[k]-1.0/3.0)*ux_temp*ux_temp
                                                 +(cy[k]*cy[k]-1.0/3.0)*uy_temp*uy_temp
                                                 +2.0*ux_temp*uy_temp*cx[k]*cy[k]));
-                f[counter*NPOP+k]=feq;
+                f[counter*NPOP+k]=feq;//将初始分布设为平衡状态
             }
             
         }
@@ -133,27 +133,27 @@ void init()
 
 
 
-void collide()
+void collide()//碰撞
 {
-    for (int counter=0;counter<NUM;counter++)
+    for (int counter=0;counter<NUM;counter++)//counter 节点编号
         if (geometry[counter]==1)
         {
-            rho[counter]=0.0;
+            rho[counter]=0.0;   //密度初始化为0
             
-            int offset=counter*NPOP;
+            int offset=counter*NPOP;    //计算初始下标
      
             double sum=0;
             for(int k=0;k<NPOP;k++)
-                sum+=f[offset+k];
+                sum+=f[offset+k];//节点粒子分布总和
     
-            rho[counter]=sum;
+            rho[counter]=sum;//碰撞前密度
 
-            double dense_temp=rho[counter];
-            double ux_temp=ux[counter];
-            double uy_temp=uy[counter];
+            double dense_temp=rho[counter];//碰撞前密度
+            double ux_temp=ux[counter];//碰撞前x方向速度
+            double uy_temp=uy[counter];//碰撞前y方向速度
 
             //BGK equilibrium
-            double feq[NPOP];
+            double feq[NPOP];//声明在BGK算子平衡状态的分布数组
     
             //TRT equilibrium
             double feq_plus[NPOP],feq_minus[NPOP];
@@ -190,7 +190,7 @@ void collide()
             feq_minus[7]=-feq_minus[5];
             feq_minus[8]=-feq_minus[6];
             
-            double u_sq=ux_temp*ux_temp+uy_temp*uy_temp;
+            double u_sq=ux_temp*ux_temp+uy_temp*uy_temp;//计算速度的平方
         
             feq_plus[1]=weights_trt[1]*dense_temp*(ce+0.5*(3.0*(cx[1]*ux_temp+cy[1]*uy_temp)*(cx[1]*ux_temp+cy[1]*uy_temp)-u_sq));
             feq_plus[2]=weights_trt[2]*dense_temp*(ce+0.5*(3.0*(cx[2]*ux_temp+cy[2]*uy_temp)*(cx[2]*ux_temp+cy[2]*uy_temp)-u_sq));
@@ -203,7 +203,7 @@ void collide()
             feq_plus[0]=dense_temp-2.0*(feq_plus[1]+feq_plus[2]+feq_plus[5]+feq_plus[6]);
 
      
-            //Collision operator
+            //Collision operator    通过碰撞算子计算碰撞后分布
             for(int k=0; k < NPOP; k++)
                 f2[offset+k]=f[offset+k]-omega_plus*(f_plus[k]-feq_plus[k])-omega_minus*(f_minus[k]-feq_minus[k]);
     }
@@ -211,7 +211,7 @@ void collide()
 }
 
 
-void update_bounce_back()
+void update_bounce_back()   //边界条件
 {
     for(int counter=0;counter<bb_nodes.size();counter++)
     {
@@ -226,7 +226,7 @@ void update_bounce_back()
 
 }
 
-void initialize_geometry()
+void initialize_geometry()  //初始化几何边界
 {
     NY=129;
     NX=129;
@@ -238,31 +238,31 @@ void initialize_geometry()
     radius=40;
     
     for(int iX=0;iX<NX;iX++)
-        for(int iY=0;iY<NY;iY++)
+        for(int iY=0;iY<NY;iY++)//遍历每个节点  设置标记
         {
             int counter=iX*NY+iY;
-            if ((iX-(NX-1)/2)*(iX-(NX-1)/2)+(iY-(NY-1)/2)*(iY-(NY-1)/2)>radius*radius)
+            if ((iX-(NX-1)/2)*(iX-(NX-1)/2)+(iY-(NY-1)/2)*(iY-(NY-1)/2)>radius*radius)   //设置圆柱体范围。内标记为1。外为-1
                 geometry[counter]=-1;
             else 
                 geometry[counter]=1;
         }
-    writegeometry("geometry_before");    
+    writegeometry("geometry_before");  //输出到记录初始状态     cylinder/geometry_before.dat  
 
     for(int iX=0;iX<NX;iX++)
-        for(int iY=0;iY<NY;iY++)
+        for(int iY=0;iY<NY;iY++)//遍历每个节点 若与外部相邻则设为边界  
         {
             int counter=iX*NY+iY;
-            if (geometry[counter]==1)
+            if (geometry[counter]==1)//暂定此节点在边界内部
             {    
-                bool flag=false;
+                bool flag=false;// 设置Boolean值 
                 for(int k=0;k<NPOP;k++)
                 {
-                    int counter2=(iX+cx[k])*NY+iY+cy[k];
-                    if (geometry[counter2]==-1)
+                    int counter2=(iX+cx[k])*NY+iY+cy[k];// 遍历此节点的每个相邻节点
+                    if (geometry[counter2]==-1)  //相邻节点为外界向左向下或左下方
                         flag=true;
                 }
                 if (flag)
-                     geometry[counter]=0;
+                     geometry[counter]=0;//设为0
             }
             
         }
@@ -271,7 +271,7 @@ void initialize_geometry()
         for(int iY=0;iY<NY;iY++)
         {
             int counter=iX*NY+iY;
-            if (geometry[counter]==0)
+            if (geometry[counter]==0)//若节点为边界
             {    
                 bool flag=false;
                 for(int k=0;k<NPOP;k++)
@@ -291,20 +291,20 @@ void initialize_geometry()
 
     for(int counter=0;counter<NUM;counter++)
     {
-        if (geometry[counter]==0)
+        if (geometry[counter]==0)  //墙体密度为1 速度为0
         {
             rho[counter]=conc_wall;
             ux[counter]=0.0;
             uy[counter]=0.0;
             bb_nodes.push_back(counter);
         }
-        else if(geometry[counter]==-1)
+        else if(geometry[counter]==-1)  //外部 密度设为-1 速度为0
         {
             rho[counter]=-1.0;
             ux[counter]=0.0;
             uy[counter]=0.0;
         }
-        else
+        else                    //墙体内部 密度速度均为0
         {
             rho[counter]=0.0;
             ux[counter]=0.0;
