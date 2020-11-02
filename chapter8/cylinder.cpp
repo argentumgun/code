@@ -43,7 +43,7 @@ int * geometry; //？？？？？？？？？？？？？
 //Boundary conditions
 double conc_wall=1.0;
 std::vector<int> bb_nodes;//边界点
-std::vector<char>* dirs;//边界点的反弹方向
+std::vector<char>* dirs;//
 int *bottom;
 int *top;
 
@@ -107,7 +107,7 @@ void init()     //初始化
     f2=new double[NUM*NPOP];        //碰撞后的分布
     
     //Bulk nodes initialization
-    double feq;                     
+    double feq;                     //单个节点的
     double geq;
     double sum;
     
@@ -125,7 +125,7 @@ void init()     //初始化
                                 +4.5*dense_temp*((cx[k]*cx[k]-1.0/3.0)*ux_temp*ux_temp
                                                 +(cy[k]*cy[k]-1.0/3.0)*uy_temp*uy_temp
                                                 +2.0*ux_temp*uy_temp*cx[k]*cy[k]));
-                f[counter*NPOP+k]=feq;//将初始分布设为平衡状态
+                f[counter*NPOP+k]=feq;//将计算出的平衡状态赋值给每个节点的速度分量
             }
             
         }
@@ -296,7 +296,7 @@ void initialize_geometry()  //初始化几何边界
             rho[counter]=conc_wall;
             ux[counter]=0.0;
             uy[counter]=0.0;
-            bb_nodes.push_back(counter);
+            bb_nodes.push_back(counter);  //记录进中vector
         }
         else if(geometry[counter]==-1)  //外部 密度设为-1 速度为0
         {
@@ -354,19 +354,19 @@ void stream()
 
 int main(int argc, char* argv[])
 {
-    initialize_geometry();
+    initialize_geometry();//初始边界
     
-    init();
+    init();//将分布初始为平衡状态
     
-    for(int counter=0;counter<=N;counter++)
+    for(int counter=0;counter<=N;counter++)//执行N次循环
     {
 
-        collide();
-        update_bounce_back();
-        stream();
+        collide();//碰撞
+        update_bounce_back();//反弹
+        stream();//移动
         
         //Writing files
-        if (counter%NOUTPUT==0)
+        if (counter%NOUTPUT==0)//每200次输出一次
         {
             std::cout<<"Counter="<<counter<<"\n";
             std::stringstream filewritedensity;
@@ -382,7 +382,7 @@ int main(int argc, char* argv[])
 
     }
 
-    finish_simulation();
+    finish_simulation();//释放内存
     
     return 0;
 }
